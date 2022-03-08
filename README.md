@@ -12,41 +12,50 @@ It uses the [D3.js](https://d3js.org/) library.
 To use this module, add the following configuration block to the modules array in the `config/config.js` file:
 ```js
 var config = {
-    modules: [
-        {
-            module: 'MMM-WeatherChartD3',
-            config: {
-                updateInterval: 10 * 60 * 1000,
-                initialLoadDelay: 0,
-                weatherProvider: "openweathermap",
-                weatherEndpoint: "/onecall",
-                apiKey: "",
-                type: "full", // "full" with "/onecall" is a hack in openweathermap provider
-                expandDaySections: true, // Hack on openweather provider - used to split in 4 entries the 4 data of a day
-                lang: config.language,
-                lat: "",
-                lon: "",
-                units: config.units,
-                locale: config.locale,
-                d3jsVersion: "7", // can either be in format "7.3" or even "7.3.0"
-                title: "Weather Forecast",
-                height: 300,
-                width: 500,
-                iconSize: undefined, // in px or undefined to define automatically at first call
-                iconURLBase: "https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/",
-                hoursRatio: 0, // Ratio of fetched hours in graph (usefull for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore
-                showMinMaxTemperature: false,
-                showFeelsLikeTemp: true,
-                showPrecipitation: true,
-                showSnow: true, // if false: snow is included in precipitations
-                showIcons: true,
-                showNights: true,
-                color: "#fff",
-                fillColor: "rgba(255, 255, 255, 0.1)",
-            }
-        },
-    ]
+	modules: [
+		{
+			module: 'MMM-WeatherChartD3',
+			config: {
+				updateInterval: 10 * 60 * 1000,
+				initialLoadDelay: 0,
+				weatherProvider: "openweathermap",
+				weatherEndpoint: "/onecall",
+				apiKey: "",
+				type: "full", // "full" with "/onecall" is a hack in openweathermap provider
+				expandDaySections: true, // Hack on openweather provider - used to split in 4 entries the 4 data of a day
+				lang: config.language,
+				lat: "",
+				lon: "",
+				units: config.units,
+				locale: config.locale,
+				d3jsVersion: "7", // can either be in format "7.3" or even "7.3.0"
+				title: "Weather Forecast",
+				height: 300,
+				width: 500,
+				iconSize: undefined, // in px or undefined to define automatically at first call
+				iconURLBase: "https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/",
+				hoursRatio: 0, // Ratio of fetched hours in graph (usefull for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore
+				showMinMaxTemperature: false,
+				showFeelsLikeTemp: true,
+				showPrecipitation: true,
+				showSnow: true, // if false: snow is included in precipitations
+				showIcons: true,
+				showNights: true,
+				color: "#fff",
+				fillColor: "rgba(255, 255, 255, 0.1)",
+			}
+		},
+	]
 }
+```
+
+## Installation
+
+```sh
+cd ~/MagicMirror/modules # Change path to modules directory of to your actual MagiMirror² installation
+git clone https://github.com/seb-ma/MMM-WeatherChartD3
+cd MMM-WeatherChartD3
+npm install --only=production
 ```
 
 ## Configuration options
