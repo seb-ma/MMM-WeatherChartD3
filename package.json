@@ -1,0 +1,8 @@
+{
+  "name": "mmm-weather-chart-d3",
+  "version": "1.0.0",
+  "description": "Retrieving and displaying data from a BME680 sensor",
+  "main": "MMM-WeatherChartD3.js",
+  "author": "Sébastien Mazzon",
+  "license": "MIT"
+}
