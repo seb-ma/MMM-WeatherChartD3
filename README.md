@@ -10,6 +10,7 @@ It uses the [D3.js](https://d3js.org/) library.
 ## Using the module
 
 To use this module, add the following configuration block to the modules array in the `config/config.js` file:
+
 ```js
 var config = {
 	modules: [
@@ -22,7 +23,7 @@ var config = {
 				weatherEndpoint: "/onecall",
 				apiKey: "",
 				type: "full", // "full" with "/onecall" is a hack in openweathermap provider
-				expandDaySections: true, // Hack on openweather provider - used to split in 4 entries the 4 data of a day
+				expandDaySections: true, // Hack on openweathermap provider - used to split in 4 entries the 4 data of a day
 				lang: config.language,
 				lat: "",
 				lon: "",
@@ -34,7 +35,7 @@ var config = {
 				width: 500,
 				iconSize: undefined, // in px or undefined to define automatically at first call
 				iconURLBase: "https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/",
-				hoursRatio: 0, // Ratio of fetched hours in graph (usefull for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore
+				hoursRatio: 0, // Ratio of fetched hours in graph (useful for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore
 				showMinMaxTemperature: false,
 				showFeelsLikeTemp: true,
 				showPrecipitation: true,
@@ -65,9 +66,9 @@ npm install --only=production
 | `updateInterval`        | *Optional* How often does the content needs to be fetched? (Milliseconds) <br><br>**Type:** `int`(milliseconds) <br>Default 100000 milliseconds (10 minutes)
 | `initialLoadDelay`      | *Optional* The initial delay before loading. If you have multiple modules that use the same API key, you might want to delay one of the requests. (Milliseconds) <br><br>**Type:** `int`(milliseconds) <br>Default 0 milliseconds
 | `weatherProvider`       | *Optional* Which weather provider should be used. <br>see https://github.com/MichMich/MagicMirror/tree/master/modules/default/weather/providers for list of available providers
-| `weatherEndpoint`       | *Optional* The OpenWeatherMap API endPoint. <br>Possible values: `/onecall` , `/forecast` (free users) or `/forecast/daily` (paying users or old apiKey only) <br>Default value: `/onecall`
+| `weatherEndpoint`       | *Optional* The openweathermap API endPoint. <br>Possible values: `/onecall` , `/forecast` (free users) or `/forecast/daily` (paying users or old apiKey only) <br>Default value: `/onecall`
 | `type`                  | *Optional* Which type of weather data should be displayed. <br>Possible values: `current` , `hourly` , `daily` , or specific value `full` which is a join of data from `hourly`+`daily` <br>Default value: `full`
-| `expandDaySections`     | *Optional* Hack on openweather provider - used to split in 4 entries the 4 data of a day (morning, day, evening, night) instead of the single `day` value
+| `expandDaySections`     | *Optional* Hack on openweathermap provider - used to split in 4 entries the 4 data of a day (morning, day, evening, night) instead of the single `day` value
 | `apiKey`                | *Required* API key to fetch the weather provider 
 | `lat`                   | *Required* Latitude of the location used for weather information. <br><br>**Type:** `float`
 | `lon`                   | *Required* Longitude of the location used for weather information. <br><br>**Type:** `float`
@@ -77,9 +78,9 @@ npm install --only=production
 | `d3jsVersion`           | *Optional* The D3 version to use. <br>Default value: "7" <br>Can either be in format "7.3" or even "7.3.0"
 | `height`                | *Optional* Height of the chart area. <br><br>**Type:** `int` (pixels)<br>Default value: 300
 | `width`                 | *Optional* Width of the chart area. <br><br>**Type:** `int` (pixels)<br>Default value: 500
-| `iconSize`              | *Optional* Size of weather icons. Auto-define the maximum possible size that fit in chart if `undefined` <br><br>**Type:** `int` (pixels)<br>Default value: undefined
+| `iconSize`              | *Optional* Size of weather icons. Auto-define the maximum possible size that fits in chart if `undefined` <br><br>**Type:** `int` (pixels)<br>Default value: undefined
 | `iconURLBase`           | *Optional* Base of the URL to retrieve icons<br> Default value: `https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/`
-| `hoursRatio`            | *Optional* Ratio of fetched hours in graph (usefull for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore <br><br>**Type:** `float` (in [0 .. 1])<br>Default value: `0`
+| `hoursRatio`            | *Optional* Ratio of fetched hours in graph (useful for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore <br><br>**Type:** `float` (in [0 .. 1])<br>Default value: `0`
 | `showMinMaxTemperature` | *Optional* Show a plot with min and max temperature for each day (if given by provider) <br><br>**Type:** `boolean`<br>Default value: `false`
 | `showFeelsLikeTemp`     | *Optional* Show a plot with the "feels like" temperature (if given by provider) <br><br>**Type:** `boolean`<br>Default value: `true`
 | `showPrecipitation`     | *Optional* Show a plot with precipitations (if given by provider). <br><br>**Type:** `boolean`<br>Default value: `true`
