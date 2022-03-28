@@ -42,7 +42,7 @@ Module.register("MMM-WeatherChartD3", {
 		this.weatherProvider.start();
 
 		(async () => {
-			await d3.json(`https://unpkg.com/d3-time-format@2/locale/${this.config.locale}.json`).then(function(locale) {
+			await d3.json(`https://unpkg.com/d3-time-format@2/locale/${this.config.locale}.json`).then(function (locale) {
 				d3.timeFormatDefaultLocale(locale);
 			});
 		})();
@@ -56,13 +56,13 @@ Module.register("MMM-WeatherChartD3", {
 		this.scheduleUpdate();
 	},
 
-	suspend: function() {
+	suspend: function () {
 		if (this.timer) {
 			clearTimeout(this.timer);
 		}
 	},
 
-	resume: function() {
+	resume: function () {
 		this.scheduleUpdate();
 	},
 
@@ -89,7 +89,7 @@ Module.register("MMM-WeatherChartD3", {
 					break;
 				case "full":
 					if (this.config.weatherEndpoint === "/onecall"
-					&& typeof this.weatherProvider.fetchWeatherAll === "function") {
+						&& typeof this.weatherProvider.fetchWeatherAll === "function") {
 						this.weatherProvider.fetchWeatherAll();
 					} else {
 						this.weatherProvider.fetchWeatherHourly();
@@ -105,8 +105,8 @@ Module.register("MMM-WeatherChartD3", {
 	getDom: function () {
 		self = this;
 
-		function ifNan(value, fallback) {return (isNaN(value) || value === null) ? fallback : value;}
-		function ifDef(value, fallback) {return (typeof(value) === "undefined" || value === null) ? fallback : value;}
+		function ifNan(value, fallback) { return (isNaN(value) || value === null) ? fallback : value; }
+		function ifDef(value, fallback) { return (typeof (value) === "undefined" || value === null) ? fallback : value; }
 
 		let dataHourly, dataDaily;
 		if (this.config.type === "hourly" || this.config.type === "full") {
@@ -126,31 +126,42 @@ Module.register("MMM-WeatherChartD3", {
 			const sortedData = d3.sort([].concat(ifDef(dataHourly, [])).concat(ifDef(dataDaily, [])), d => d.date);
 
 			// Frame
-			const margin = {top: 0, right: 10, bottom: 30, left: 10};
+			const margin = { top: 0, right: 10, bottom: 30, left: 10 };
 			const legendBarWidth = 55;
 			const innerWidth = this.config.width - margin.left - margin.right - 2 * legendBarWidth;
-			
+
 			// Define x scale
 			let xTime;
 			if (dataHourly && dataDaily) {
-				rangeX = (ifNan(this.config.hoursRatio, 0) !== 0) ? [0, innerWidth * (1 - this.config.hoursRatio), innerWidth] : [0, innerWidth];
+				let rangeX = [0, innerWidth];
+				let domainX = [d3.min(dataHourly, d => d.date), d3.max(dataDaily, d => d.date)];
+				if (ifNan(this.config.hoursRatio, 0) !== 0) {
+					rangeX = [0, innerWidth * (1 - this.config.hoursRatio), innerWidth];
+					domainX = [d3.min(dataHourly, d => d.date), d3.max(dataHourly, d => d.date), d3.max(dataDaily, d => d.date)];
+				}
 				xTime = d3.scaleTime()
-					.domain([d3.min(dataHourly, d => d.date), d3.max(dataHourly, d => d.date), d3.max(dataDaily, d => d.date)])
-					.range([0, innerWidth * (1 - this.config.hoursRatio), innerWidth]);
+					.domain(domainX)
+					.range(rangeX);
 			} else {
 				xTime = d3.scaleTime()
 					.domain(d3.extent(sortedData, d => d.date))
 					.range([0, innerWidth]);
 			}
-			if (this.config.iconSize === undefined && sortedData.length > 1) {
-				let minDelta = Infinity;
-				for (var i = 1; i < sortedData.length; i++) {
-					const delta = xTime(sortedData[i].date) - xTime(sortedData[i - 1].date)
-					if (minDelta > delta) {
-						minDelta = delta;
-					}
+
+			// Define icon size and gap between icons
+			let minDelta = Infinity;
+			for (var i = 1; i < sortedData.length; i++) {
+				const delta = xTime(sortedData[i].date) - xTime(sortedData[i - 1].date)
+				if (minDelta > delta) {
+					minDelta = delta;
 				}
-				this.config.iconSize = minDelta * 4 ;
+			}
+			if (this.config.iconSize === undefined && sortedData.length > 1) {
+				const magnifier = 5; // Should be <= 6
+				this.config.iconSize = minDelta * magnifier;
+				this.deltaIcons = minDelta * 3 / magnifier;
+			} else {
+				this.deltaIcons = this.config.iconSize;
 			}
 
 			// Frame
@@ -175,7 +186,7 @@ Module.register("MMM-WeatherChartD3", {
 				.attr("transform", `translate(0, ${innerHeight})`)
 				.call(d3.axisBottom(xTime)
 					.tickValues(d3.timeHour.every(3).range(d3.min(dataHourly, d => d.date), d3.max(dataHourly, d => d.date))
-					.concat(d3.timeHour.every(6).range(d3.min(dataDaily, d => d.date), d3.max(dataDaily, d => d.date))))
+						.concat(d3.timeHour.every(6).range(d3.min(dataDaily, d => d.date), d3.max(dataDaily, d => d.date))))
 					.tickFormat(d3.timeFormat('%Hh'))
 				);
 
@@ -196,13 +207,13 @@ Module.register("MMM-WeatherChartD3", {
 					.ticks(d3.timeDay.every(1))
 					.tickSize(-innerHeight, 0, 0).tickPadding(legendBarWidth)
 					.tickFormat(d3.timeFormat('%a %d')))
-					// Shift text to start of tick
-					.selectAll("text").style("text-anchor", "start");
+				// Shift text to start of tick
+				.selectAll("text").style("text-anchor", "start");
 
 			// Add Y axis (temperature)
 			const yTemp = d3.scaleLinear()
 				.domain([d3.min(sortedData, d => Math.min(ifNan(d.temperature, Infinity), ifNan(d.minTemperature, Infinity), ifNan(d.feelsLikeTemp, Infinity)) - 1),
-						 d3.max(sortedData, d => Math.max(ifNan(d.temperature, -Infinity), ifNan(d.maxTemperature, -Infinity), ifNan(d.feelsLikeTemp, -Infinity)) + 1)])
+				d3.max(sortedData, d => Math.max(ifNan(d.temperature, -Infinity), ifNan(d.maxTemperature, -Infinity), ifNan(d.feelsLikeTemp, -Infinity)) + 1)])
 				.range([innerHeight, 0]);
 
 			svg.append("g")
@@ -255,7 +266,7 @@ Module.register("MMM-WeatherChartD3", {
 					.attr("class", "y-axis")
 					.attr("transform", `translate(${innerWidth}, 0)`)
 					.call(d3.axisRight(yPrecip));
-	
+
 				// Y axis (rain) label
 				svg.append("text")
 					.attr("class", "y-axis-label")
@@ -272,7 +283,7 @@ Module.register("MMM-WeatherChartD3", {
 					.attr("stroke", this.config.color)
 					.attr("stroke-width", 1.5)
 					.attr('opacity', 1)
-					.attr("d",d3.area().curve(d3.curveMonotoneX)
+					.attr("d", d3.area().curve(d3.curveMonotoneX)
 						.x(d => xTime(d.date))
 						.y0(d => yPrecip(0))
 						.y1(d => yPrecip(this.config.showSnow ? ifNan(d.rain, 0) : ifNan(d.precipitation, 0))) // Include snow if not displayed separtly
@@ -281,18 +292,18 @@ Module.register("MMM-WeatherChartD3", {
 				if (this.config.showSnow)
 					// Add snow
 					svg.append("path")
-					.attr("id", "snow")
-					.datum(sortedData)
-					.attr("fill", this.config.fillColor)
-					.attr("stroke", this.config.color)
-					.attr("stroke-dasharray", "10,2")
-					.attr("stroke-width", 1)
-					.attr('opacity', 0.7)
-					.attr("d",d3.area().curve(d3.curveMonotoneX)
-						.x(d => xTime(d.date))
-						.y0(d => yPrecip(0))
-						.y1(d => yPrecip(ifNan(d.snow, 0)))
-					);
+						.attr("id", "snow")
+						.datum(sortedData)
+						.attr("fill", this.config.fillColor)
+						.attr("stroke", this.config.color)
+						.attr("stroke-dasharray", "10,2")
+						.attr("stroke-width", 1)
+						.attr('opacity', 0.7)
+						.attr("d", d3.area().curve(d3.curveMonotoneX)
+							.x(d => xTime(d.date))
+							.y0(d => yPrecip(0))
+							.y1(d => yPrecip(ifNan(d.snow, 0)))
+						);
 			}
 
 			// Add temperature min/max
@@ -303,10 +314,10 @@ Module.register("MMM-WeatherChartD3", {
 					.attr("fill", this.config.fillColor)
 					.attr("stroke", this.config.color)
 					.attr("stroke-width", 1.5)
-					.attr("d",d3.area().curve(d3.curveNatural)
+					.attr("d", d3.area().curve(d3.curveNatural)
 						.x(d => xTime(d.date))
 						.y0(d => yTemp(d.minTemperature))
-						.y1(d => yTemp(d.maxTemperature)) 
+						.y1(d => yTemp(d.maxTemperature))
 					);
 			}
 
@@ -325,18 +336,18 @@ Module.register("MMM-WeatherChartD3", {
 			// Add feels alike temperature
 			if (this.config.showFeelsLikeTemp) {
 				svg.append("path")
-				.attr("id", "feelsLikeTemp")
-				.datum(sortedData.filter(d => (d.feelsLikeTemp !== null)))
-				.attr("fill", "none")
-				.attr("stroke", this.config.color)
-				.attr("stroke-width", 1.5)
-				.attr("stroke-dasharray", "5, 5")
-				.attr("d", d3.line().curve(d3.curveNatural)
-					.x(d => xTime(d.date))
-					.y(d => yTemp(d.feelsLikeTemp))
-				);
+					.attr("id", "feelsLikeTemp")
+					.datum(sortedData.filter(d => (d.feelsLikeTemp !== null)))
+					.attr("fill", "none")
+					.attr("stroke", this.config.color)
+					.attr("stroke-width", 1.5)
+					.attr("stroke-dasharray", "5, 5")
+					.attr("d", d3.line().curve(d3.curveNatural)
+						.x(d => xTime(d.date))
+						.y(d => yTemp(d.feelsLikeTemp))
+					);
 			}
-			
+
 			// Add weather icons
 			if (this.config.showIcons) {
 				let lastIcon = undefined; // static
@@ -350,7 +361,7 @@ Module.register("MMM-WeatherChartD3", {
 				let lastDown = true;
 				// Un-align icons if previous is too close
 				function fctIconY(d, i) {
-					if (lastDown || xTime(d.date) - xTime(dataIcons[i - 1].date) >= self.config.iconSize) {
+					if (lastDown || xTime(d.date) - xTime(dataIcons[i - 1].date) >= this.deltaIcons) {
 						lastDown = false;
 						return -self.config.iconSize;
 					} else {
@@ -383,7 +394,7 @@ Module.register("MMM-WeatherChartD3", {
 	getScripts: function () {
 		// Load d3 from CDN
 		return [
-			"https://cdn.jsdelivr.net/npm/d3@" + this.config.d3jsVersion +"/dist/d3.min.js",
+			"https://cdn.jsdelivr.net/npm/d3@" + this.config.d3jsVersion + "/dist/d3.min.js",
 			"suncalc.js"
 		];
 	},
