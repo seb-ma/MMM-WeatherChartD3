@@ -149,19 +149,16 @@ Module.register("MMM-WeatherChartD3", {
 			}
 
 			// Define icon size and gap between icons
-			let minDelta = Infinity;
-			for (var i = 1; i < sortedData.length; i++) {
-				const delta = xTime(sortedData[i].date) - xTime(sortedData[i - 1].date)
-				if (minDelta > delta) {
-					minDelta = delta;
+			if (this.config.iconSize === undefined) {
+				let minDelta = Infinity;
+				for (var i = 1; i < sortedData.length; i++) {
+					const delta = xTime(sortedData[i].date) - xTime(sortedData[i - 1].date)
+					if (minDelta > delta) {
+						minDelta = delta;
+					}
 				}
-			}
-			if (this.config.iconSize === undefined && sortedData.length > 1) {
-				const magnifier = 5; // Should be <= 6
+				const magnifier = this.config.width / minDelta / 25; // Empiric value
 				this.config.iconSize = minDelta * magnifier;
-				this.deltaIcons = minDelta * 3 / magnifier;
-			} else {
-				this.deltaIcons = this.config.iconSize;
 			}
 
 			// Frame
@@ -358,15 +355,21 @@ Module.register("MMM-WeatherChartD3", {
 				}
 
 				const dataIcons = sortedData.filter(differentThanPrevious) // Display only icons that are different from previous
-				let lastDown = true;
+				let lastPosNb = 1;
+				let sumLastStack = 0;
 				// Un-align icons if previous is too close
 				function fctIconY(d, i) {
-					if (lastDown || xTime(d.date) - xTime(dataIcons[i - 1].date) >= this.deltaIcons) {
-						lastDown = false;
-						return -self.config.iconSize;
+					let nb = 1;
+					if (i > 0) {
+						nb = (xTime(d.date) - xTime(dataIcons[i - 1].date)) / self.config.iconSize;
+					}
+					sumLastStack += nb * self.config.iconSize;
+					if (nb < 1 && sumLastStack < self.config.iconSize) {
+						return -self.config.iconSize + lastPosNb++ * self.config.iconSize / 1.5;
 					} else {
-						lastDown = true;
-						return 0;
+						sumLastStack = 0;
+						lastPosNb = 1;
+						return -self.config.iconSize;
 					}
 				}
 
