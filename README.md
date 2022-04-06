@@ -15,7 +15,7 @@ To use this module, add the following configuration block to the modules array i
 var config = {
 	modules: [
 		{
-			module: 'MMM-WeatherChartD3',
+			module: "MMM-WeatherChartD3",
 			config: {
 				updateInterval: 10 * 60 * 1000,
 				initialLoadDelay: 0,
