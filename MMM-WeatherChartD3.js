@@ -1,14 +1,26 @@
-/* Magic Mirror
- * Module: MMM-Bosch-BME680-sensor
- *
- * By Sébastien Mazzon
- * MIT Licensed.
+/**
+ * This MagicMirror² module displays a weather chart using any weather provider.
+ * It can display temperature, feels like temperature, precipitation, snow and weather icons.
+ * It uses the D3.js library.
+ * @module MMM-WeatherChartD3
+ * @class Module
+ * @see `README.md`
+ * @author Sébastien Mazzon
+ * @license MIT - @see `LICENCE.txt`
  */
+"use strict";
 
 Module.register("MMM-WeatherChartD3", {
+
+	/**
+	 * Default properties of the module
+	 * @see `module.defaults`
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#defaults>
+	 */
 	defaults: {
 		updateInterval: 10 * 60 * 1000,
 		initialLoadDelay: 0, // 0 seconds delay
+		animationSpeed: 1000,
 		weatherProvider: "openweathermap",
 		weatherEndpoint: "/onecall",
 		type: "full", // Possible values: hourly, forecast (=daily) or specific value `full` which is a join of data from hourly+daily
@@ -35,61 +47,95 @@ Module.register("MMM-WeatherChartD3", {
 		fillColor: "rgba(255, 255, 255, 0.1)",
 	},
 
+	/**
+	 * Number of calls to `updateAvailable` before triggering `updateDom` (set by `scheduleUpdate`)
+	 */
 	nbUpdateWait: 0,
 
+	/**
+	 * Initializes module
+	 * @see `module.start`
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#start>
+	 */
 	start: function () {
-		// Initialize the weather provider.
+		// Initializes and starts the weather provider
 		this.weatherProvider = WeatherProvider.initialize(this.config.weatherProvider, this);
-		// Let the weather provider know we are starting.
 		this.weatherProvider.start();
 
+		// Loads D3 locale
 		(async () => {
 			await d3.json(`https://unpkg.com/d3-time-format@2/locale/${this.config.locale}.json`).then(function (locale) {
 				d3.timeFormatDefaultLocale(locale);
 			});
 		})();
-		// Schedule the first update.
+
+		// Schedules the first update
 		this.scheduleUpdate(this.config.initialLoadDelay);
 	},
 
+	/**
+	 * Returns the CSS files used by getDom
+	 * @see `module.getStyles`
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#getstyles>
+	 * @returns {Array}
+	 */
 	getStyles: function () {
 		return [`${this.name}.css`];
 	},
 
+	/**
+	 * Returns the scripts necessary for the chart and weather provider
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#getscripts>
+	 * @returns {string[]} An array with filenames
+	 */
 	getScripts: function () {
 		const pathWeather = "modules/default/weather/";
 		return [
-			// Load d3 from CDN
+			// Loads d3 from CDN
 			`https://cdn.jsdelivr.net/npm/d3@${this.config.d3jsVersion}/dist/d3.min.js`,
 			"suncalc.js",
 			`${pathWeather}providers/${this.config.weatherProvider.toLowerCase()}.js`,
 		];
 	},
 
+	/**
+	 * Called when the provider has retrieved data
+	 */
 	updateAvailable: function () {
 		this.nbUpdateWait--;
 		if (this.nbUpdateWait <= 0) {
+			// No more waiting call - update DOM with all the available data and schedule next update
 			Log.log("New weather information available.");
-			this.updateDom(0);
+			this.updateDom(this.config.animationSpeed);
 			this.scheduleUpdate();
 		}
 	},
 
+	/**
+	 * Called when the module is hidden
+	 * @see `module.suspend`
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#suspend>
+	 */
 	suspend: function () {
+		// Stop scheduled updates
 		if (this.timer) {
 			clearTimeout(this.timer);
 		}
 	},
 
+	/**
+	 * Called when the module is shown
+	 * @see `module.resume`
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#resume>
+	 */
 	resume: function () {
-		this.scheduleUpdate();
+		// Instantly restart scheduled updates
+		this.scheduleUpdate(0);
 	},
 
-	/* scheduleUpdate()
-	 * Schedule next update.
-	 *
-	 * argument delay number - Milliseconds before next update.
-	 *  If empty, this.config.updateInterval is used.
+	/**
+	 * Schedules next data retrieving
+	 * @param {integer} delay Delay before updating - use config.updateInterval if null
 	 */
 	scheduleUpdate: function (delay = null) {
 		let nextLoad = this.config.updateInterval;
@@ -124,12 +170,25 @@ Module.register("MMM-WeatherChartD3", {
 		}, nextLoad);
 	},
 
+	/**
+	 * Returns value or a fallback if value is not a number
+	 * @param {*} value Value to check
+	 * @param {*} fallback Fallback value
+	 * @returns Fallback if value if is null or not a number, else: value
+	 */
 	ifNan: function (value, fallback) {
 		return (isNaN(value) || value === null) ? fallback : value;
 	},
 
+	/**
+	 * Generates the DOM containing the chart
+	 *
+	 * @see `module.getDom`
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#getdom>
+	 * @returns {HTMLElement|Promise} The DOM to display
+	 */
 	getDom: function () {
-		function ifDef(value, fallback) { return (typeof (value) === "undefined" || value === null) ? fallback : value; }
+		const ifDef = (value, fallback) => (typeof (value) === "undefined" || value === null) ? fallback : value;
 
 		const dataHourly = ifDef(this.weatherProvider.weatherHourly(), []);
 		let dataDaily = ifDef(this.weatherProvider.weatherForecast(), []);
@@ -214,7 +273,7 @@ Module.register("MMM-WeatherChartD3", {
 					.domain([0, d3.max(sortedData, d => this.ifNan(d.precipitation, 5))]) // world record: ~300mm for an hour
 					.range([innerHeight, 0]);
 
-				this.svgAddPrecipitation(svg, sortedData, xTime, yPrecip, innerWidth, innerHeight, margin);
+				this.svgAddPrecipitation(svg, sortedData, xTime, yPrecip, innerWidth, margin);
 			}
 
 			// Add temperature min/max
@@ -240,7 +299,17 @@ Module.register("MMM-WeatherChartD3", {
 		return document.createElement("div");
 	},
 
-	// Add grids and axis to svg
+	/**
+	 * Adds grids and axis to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} dataHourly Data of weatherHourly
+	 * @param {Array} dataDaily Data of weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {integer} margin Margin of the chart (in pixels)
+	 * @param {integer} legendBarWidth Width of the legend (in pixels)
+	 */
 	addGridAndAxis: function (svg, dataHourly, dataDaily, xTime, yTemp, innerHeight, margin, legendBarWidth) {
 		// Add X axis (date)
 		svg.append("g")
@@ -286,7 +355,14 @@ Module.register("MMM-WeatherChartD3", {
 			.text(this.config.units === "imperial" ? "°F" : "°C");
 	},
 
-	// Add day/night to svg
+	/**
+	 * Adds day/night to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 */
 	svgAddDayNight: function (svg, sortedData, xTime, innerWidth, innerHeight) {
 		let sunTimesData = [];
 		var iterd = sortedData[0].date;
@@ -295,9 +371,7 @@ Module.register("MMM-WeatherChartD3", {
 			iterd = iterd.clone().add(1, 'd');
 		}
 
-		function fctNightWidth(d1, d2) {
-			return Math.min(innerWidth, d2 ? xTime(d2.sunrise) : innerWidth) - Math.max(0, xTime(d1.sunset));
-		}
+		const fctNightWidth = (d1, d2) => Math.min(innerWidth, d2 ? xTime(d2.sunrise) : innerWidth) - Math.max(0, xTime(d1.sunset));
 
 		svg.selectAll("grp")
 			.append("g")
@@ -312,8 +386,16 @@ Module.register("MMM-WeatherChartD3", {
 			.attr('opacity', 0.05);
 	},
 
-	// Add precipitation and snow to svg
-	svgAddPrecipitation: function (svg, sortedData, xTime, yPrecip, innerWidth, innerHeight, margin) {
+	/**
+	 * Adds precipitation and snow to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {d3.scaleLinear} yPrecip Y-axis scale (precipitations)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} margin Margin of the chart (in pixels)
+	 */
+	svgAddPrecipitation: function (svg, sortedData, xTime, yPrecip, innerWidth, margin) {
 		// Add Y axis (rain)
 		svg.append("g")
 			.attr("class", "y-axis")
@@ -360,7 +442,13 @@ Module.register("MMM-WeatherChartD3", {
 		}
 	},
 
-	// Add min/max temperature to svg
+	/**
+	 * Add min/max temperature to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
+	 */
 	svgAddTemperatureMinMax: function (svg, sortedData, xTime, yTemp) {
 		svg.append("path")
 			.attr("id", "min-max-temperature")
@@ -375,7 +463,13 @@ Module.register("MMM-WeatherChartD3", {
 			);
 	},
 
-	// Add temperature to svg
+	/**
+	 * Adds temperature to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
+	 */
 	svgAddTemperature: function (svg, sortedData, xTime, yTemp) {
 		svg.append("path")
 			.attr("id", "temperature")
@@ -389,7 +483,13 @@ Module.register("MMM-WeatherChartD3", {
 			);
 	},
 
-	// Add feels alike temperature to svg
+	/**
+	 * Adds feels alike temperature to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
+	 */
 	svgAddFeelsAlikeTemperature: function (svg, sortedData, xTime, yTemp) {
 		svg.append("path")
 			.attr("id", "feelsLikeTemp")
@@ -404,7 +504,12 @@ Module.register("MMM-WeatherChartD3", {
 			);
 	},
 
-	// Add weather icons to svg
+	/**
+	 * Adds weather icons to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 */
 	svgAddWeatherIcons: function (svg, sortedData, xTime) {
 		let lastIcon = undefined; // static
 		function differentThanPrevious(d) {
@@ -443,4 +548,5 @@ Module.register("MMM-WeatherChartD3", {
 			.attr("x", d => xTime(d.date))
 			.attr("y", fctIconY.bind(this));
 	},
+
 });
