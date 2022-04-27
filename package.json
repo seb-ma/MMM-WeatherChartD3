@@ -1,18 +1,18 @@
 {
-  "name": "mmm-weather-chart-d3",
-  "version": "1.0.0",
-  "description": "This MagicMirror² module displays a weather chart using any weather provider. It can display temperature, feels like temperature, precipitation, snow and weather icons. It uses the D3.js library.",
-  "main": "MMM-WeatherChartD3.js",
-  "author": "Sébastien Mazzon",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/seb-ma/MMM-WeatherChartD3"
-  },
-  "keywords": [
-    "magicmirror-module",
-    "magicmirror2",
-    "d3js",
-    "weather-station"
-  ]
+	"name": "mmm-weather-chart-d3",
+	"version": "1.0.0",
+	"description": "This MagicMirror² module displays a weather chart using any weather provider. It can display temperature, feels like temperature, precipitation, snow and weather icons. It uses the D3.js library.",
+	"main": "MMM-WeatherChartD3.js",
+	"author": "Sébastien Mazzon",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/seb-ma/MMM-WeatherChartD3"
+	},
+	"keywords": [
+		"magicmirror-module",
+		"magicmirror2",
+		"d3js",
+		"weather-station"
+	]
 }
