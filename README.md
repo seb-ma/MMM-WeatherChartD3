@@ -28,22 +28,26 @@ var config = {
 				lon: "",
 				units: config.units,
 				locale: config.locale,
-				d3jsVersion: "7", // can either be in format "7.3" or even "7.3.0"
+				d3jsVersion: "7", // can either be in format "7.4" or even "7.4.4"
 				title: "Weather Forecast",
 				height: 300,
 				width: 500,
 				iconSize: undefined, // in px or undefined to define automatically at first call
 				iconURLBase: "https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/",
 				hoursRatio: 0, // Ratio of fetched hours in graph (useful for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore
+				showIcons: true,
+				showNights: true,
+				showTemperature: true,
 				showMinMaxTemperature: false,
 				showFeelsLikeTemp: true,
 				showPrecipitation: true,
+				showPrecipitationProba: true, // Only used when showPrecipitation == true
 				showSnow: true, // if false: snow is included in precipitations
-				showIcons: true,
-				showNights: true,
-				showAQI: false,
-				color: "#fff",
-				fillColor: "rgba(255, 255, 255, 0.1)",
+				showPressure: true,
+				showHumidity: true,
+				showWind: true,
+				showAQI: true,
+				showUVI: true,
 			}
 		},
 	]
@@ -59,7 +63,9 @@ cd MMM-WeatherChartD3
 npm install --only=production
 ```
 
-## Configuration options
+## Configuration
+
+### Options
 
 | Option					| Description
 |-------------------------- |-------------
@@ -74,18 +80,26 @@ npm install --only=production
 | `lang`					| *Optional* The language sent to provided.<br>Default value: uses value of `config.language`
 | `units`					| *Optional* What units to use. Specified by config.js<br>Default value: uses value of `config.units`
 | `locale`					| *Optional* The locale of the days.<br>Default value: uses value of `config.locale`
-| `d3jsVersion`				| *Optional* The D3 version to use.<br>Default value: "7"<br>Can either be in format "7.3" or even "7.3.0"
+| `d3jsVersion`				| *Optional* The D3 version to use.<br>Default value: "7"<br>Can either be in format "7.4" or even "7.4.4"
 | `height`					| *Optional* Height of the chart area.<br><br>**Type:** `int` (pixels)<br>Default value: 300
 | `width`					| *Optional* Width of the chart area.<br><br>**Type:** `int` (pixels)<br>Default value: 500
 | `iconSize`				| *Optional* Size of weather icons. Auto-define the maximum possible size that fits in chart if `undefined`<br><br>**Type:** `int` (pixels)<br>Default value: undefined
 | `iconURLBase`				| *Optional* Base of the URL to retrieve icons<br> Default value: `https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/`
 | `hoursRatio`				| *Optional* Ratio of fetched hours in graph (useful for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore<br><br>**Type:** `float` (in [0 .. 1])<br>Default value: `0`
+| `showIcons`				| *Optional* Show weather icons<br><br>**Type:** `boolean`<br>Default value: `true`
+| `showNights`				| *Optional* Show a background color for nights<br><br>**Type:** `boolean`<br>Default value: `true`
+| `showTemperature`			| *Optional* Show a plot with temperature for each day<br><br>**Type:** `boolean`<br>Default value: `true`
 | `showMinMaxTemperature`	| *Optional* Show a plot with min and max temperature for each day (if given by provider)<br><br>**Type:** `boolean`<br>Default value: `false`
 | `showFeelsLikeTemp`		| *Optional* Show a plot with the "feels like" temperature (if given by provider)<br><br>**Type:** `boolean`<br>Default value: `true`
 | `showPrecipitation`		| *Optional* Show a plot with precipitations (if given by provider).<br><br>**Type:** `boolean`<br>Default value: `true`
+| `showPrecipitationProba`	| *Optional* Show precipitations probability (if given by provider). Only displayed when `showPrecipitation` == `true`<br><br>**Type:** `boolean`<br>Default value: `true`
 | `showSnow`				| *Optional* Show a plot with snow (if given by provider). Include snow in precipitations plot if set to `false`<br><br>**Type:** `boolean`<br>Default value: `true`
+| `showHumidity`			| *Optional* Show a plot with humidity (if given by provider).<br><br>**Type:** `boolean`<br>Default value: `true`
+| `showWind`				| *Optional* Show a plot with wind speed (if given by provider).<br><br>**Type:** `boolean`<br>Default value: `true`
 | `showAQI`					| *Optional* Show Air Quality Index (if given by provider).<br><br>**Type:** `boolean`<br>Default value: `true`
-| `showIcons`				| *Optional* Show weather icons<br><br>**Type:** `boolean`<br>Default value: `true`
-| `showNights`				| *Optional* Show a background color for nights<br><br>**Type:** `boolean`<br>Default value: `true`
-| `color`					| *Optional* Color used by plots<br>Default value: `#fff`
-| `fillColor`				| *Optional* Color used to fill plots<br>Default value: `rgba(255, 255, 255, 0.1)`
+| `showUVI`					| *Optional* Show UVI (if given by provider).<br><br>**Type:** `boolean`<br>Default value: `true`
+
+### Styling
+
+This chart can have a fully customized style.
+Each item type have a specific class that can be overloaded in `custom.css`.

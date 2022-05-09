@@ -7,12 +7,59 @@
  *
  */
 
-.MMM-WeatherChartD3 .tick {
+:root {
+	--MMM-WeatherChartD3-color: var(--color-text);
+	--MMM-WeatherChartD3-fillColor: var(--color-text-dimmed);
+}
+
+.MMM-WeatherChartD3 .tick,
+.MMM-WeatherChartD3 .y-axis-label,
+.MMM-WeatherChartD3 .curve-value {
 	font-family: var(--font-primary), sans-serif;
 	font-size: 0.75rem;
 }
 
-.MMM-WeatherChartD3 .y-axis-label {
+.MMM-WeatherChartD3 .axis-label {
 	font-family: var(--font-primary), sans-serif;
-	font-size: 0.75rem;
+	font-size: 0.65rem;
+}
+
+.MMM-WeatherChartD3 .curve {
+	fill: none;
+	opacity: 1;
+	stroke: var(--MMM-WeatherChartD3-color);
+	stroke-width: 1.5;
+}
+
+.MMM-WeatherChartD3 .night {
+	opacity: 0.05;
+}
+
+.MMM-WeatherChartD3 .precipitation {
+	fill: var(--MMM-WeatherChartD3-fillColor);
+}
+
+.MMM-WeatherChartD3 .snow {
+	fill: var(--MMM-WeatherChartD3-fillColor);
+	opacity: 0.7;
+	stroke-dasharray: 10, 2;
+}
+
+.MMM-WeatherChartD3 .pressure {
+	opacity: 0.5;
+	stroke-dasharray: 40, 5;
+}
+
+.MMM-WeatherChartD3 .humidity {
+	opacity: 0.5;
+	stroke-dasharray: 2, 2;
+}
+
+.MMM-WeatherChartD3 .wind {
+	opacity: 0.5;
+	stroke-dasharray: 15, 5;
+}
+
+.MMM-WeatherChartD3 .feelsLikeTemp {
+	stroke-dasharray: 5, 5;
 }

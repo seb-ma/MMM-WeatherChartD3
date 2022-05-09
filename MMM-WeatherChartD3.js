@@ -30,21 +30,25 @@ Module.register("MMM-WeatherChartD3", {
 		lang: config.language,
 		units: config.units,
 		locale: config.locale,
-		d3jsVersion: "7", // can either be in format "7.3" or even "7.3.0"
+		d3jsVersion: "7", // can either be in format "7.4" or even "7.4.4"
 		height: 300,
 		width: 500,
 		iconSize: undefined, // in px or undefined to define automatically at first call
 		iconURLBase: "https://raw.githubusercontent.com/erikflowers/weather-icons/master/svg/",
 		hoursRatio: 0, // Ratio of fetched hours in graph (useful for openweathermap onecall that gives 48h with 1h precision) - 0 or undefined to ignore
+		showIcons: true,
+		showNights: true,
+		showTemperature: true,
 		showMinMaxTemperature: false,
 		showFeelsLikeTemp: true,
 		showPrecipitation: true,
-		showAQI: true,
+		showPrecipitationProba: true, // Only used when showPrecipitation == true
 		showSnow: true, // if false: snow is included in precipitations
-		showIcons: true,
-		showNights: true,
-		color: "#fff",
-		fillColor: "rgba(255, 255, 255, 0.1)",
+		showPressure: true,
+		showHumidity: true,
+		showWind: true,
+		showAQI: true,
+		showUVI: true,
 	},
 
 	/**
@@ -188,6 +192,7 @@ Module.register("MMM-WeatherChartD3", {
 	 * @returns {HTMLElement|Promise} The DOM to display
 	 */
 	getDom: function () {
+		const promises = [];
 		const ifDef = (value, fallback) => (typeof (value) === "undefined" || value === null) ? fallback : value;
 
 		const dataHourly = ifDef(this.weatherProvider.weatherHourly(), []);
@@ -195,7 +200,7 @@ Module.register("MMM-WeatherChartD3", {
 
 		if (dataHourly.length > 0 || dataDaily.length > 0) {
 			if (dataHourly.length > 0 && dataDaily.length > 0) {
-				// Remove current day and next day (provided by dataHourly)
+				// Remove current day and next day of dataDaily (provided by dataHourly)
 				const dateMaxHourly = d3.max(dataHourly, d => d.date);
 				dataDaily = dataDaily.filter(d => d.date.isAfter(dateMaxHourly));
 			}
@@ -203,9 +208,9 @@ Module.register("MMM-WeatherChartD3", {
 			const sortedData = d3.sort([].concat(dataHourly).concat(dataDaily), d => d.date);
 
 			// Frame
-			const margin = { top: 0, right: 10, bottom: 30, left: 10 };
+			const margins = { top: 0, right: 10, bottom: 30, left: 10 };
 			const legendBarWidth = 55;
-			const innerWidth = this.config.width - margin.left - margin.right - 2 * legendBarWidth;
+			const innerWidth = this.config.width - margins.left - margins.right - 2 * legendBarWidth;
 
 			// Define x scale
 			let xTime;
@@ -234,69 +239,109 @@ Module.register("MMM-WeatherChartD3", {
 						minDelta = delta;
 					}
 				}
-				const magnifier = this.config.width / minDelta / 25; // Empiric value
+				const magnifier = this.config.width / minDelta / 30; // Empiric value
 				this.config.iconSize = minDelta * magnifier;
 			}
 
 			// Frame
-			margin.top = this.config.iconSize;
-			const innerHeight = this.config.height - margin.top - margin.bottom - legendBarWidth;
+			margins.top = this.config.iconSize;
+			const innerHeight = this.config.height - margins.top - margins.bottom - legendBarWidth;
 
 			// Remove existing svg
 			d3.select(`#${this.identifier} svg`).remove();
-			// Add new svg
+			// Adds new svg
 			const svg = d3.select(`#${this.identifier}`)
 				.append("svg")
 				.attr("width", this.config.width)
 				.attr("height", this.config.height)
 				.append("g")
 				.attr("id", "grp")
-				.attr("transform", `translate(${margin.left + legendBarWidth}, ${margin.top})`);
+				.attr("transform", `translate(${margins.left + legendBarWidth}, ${margins.top})`);
 
-			// Add Y axis (temperature)
+			// Adds Y axis (temperature)
 			const yTemp = d3.scaleLinear()
-				.domain([d3.min(sortedData, d => Math.min(this.ifNan(d.temperature, Infinity), this.ifNan(d.minTemperature, Infinity), this.ifNan(d.feelsLikeTemp, Infinity)) - 1),
-				d3.max(sortedData, d => Math.max(this.ifNan(d.temperature, -Infinity), this.ifNan(d.maxTemperature, -Infinity), this.ifNan(d.feelsLikeTemp, -Infinity)) + 1)])
+				.domain([
+					d3.min(sortedData, d => Math.min(this.ifNan(d.temperature, 0), this.ifNan(d.minTemperature, 0), this.ifNan(d.feelsLikeTemp, 0)) - 1),
+					d3.max(sortedData, d => Math.max(this.ifNan(d.temperature, 40), this.ifNan(d.maxTemperature, 40), this.ifNan(d.feelsLikeTemp, 40)) + 1)
+				])
 				.range([innerHeight, 0]);
 
-			// Add grids and axis
-			this.addGridAndAxis(svg, dataHourly, dataDaily, xTime, yTemp, innerHeight, margin, legendBarWidth);
+			// Adds grids and axis
+			promises.push(this.addGridAndAxis(svg, dataHourly, dataDaily, xTime, innerHeight, legendBarWidth));
 
-			// Add day/night
+			// Adds day/night
 			if (this.config.showNights && sortedData.length > 1) {
-				this.svgAddDayNight(svg, sortedData, xTime, innerWidth, innerHeight);
+				promises.push(this.svgAddDayNight(svg, sortedData, xTime, innerWidth, innerHeight, margins));
 			}
-
-			// Add precipitation (rain/snow)
+			// Adds precipitation (rain/snow)
 			if (this.config.showPrecipitation) {
-				const yPrecip = d3.scaleLinear()
-					.domain([0, d3.max(sortedData, d => this.ifNan(d.precipitation, 5))]) // world record: ~300mm for an hour
-					.range([innerHeight, 0]);
-
-				this.svgAddPrecipitation(svg, sortedData, xTime, yPrecip, innerWidth, margin);
+				promises.push(this.svgAddPrecipitation(svg, sortedData, xTime, innerWidth, innerHeight, margins));
 			}
-
-			// Add temperature min/max
+			// Adds pressure
+			if (this.config.showPressure) {
+				promises.push(this.svgAddPressure(svg, sortedData, xTime, innerWidth, innerHeight, margins));
+			}
+			// Adds temperature min/max
 			if (this.config.showMinMaxTemperature) {
-				this.svgAddTemperatureMinMax(svg, sortedData, xTime, yTemp);
+				promises.push(this.svgAddTemperatureMinMax(svg, sortedData, xTime, innerWidth, innerHeight, margins, yTemp));
 			}
-
-			// Add temperature
-			this.svgAddTemperature(svg, sortedData, xTime, yTemp);
-
-			// Add feels alike temperature
+			// Adds temperature
+			if (this.config.showTemperature) {
+				promises.push(this.svgAddTemperature(svg, sortedData, xTime, innerWidth, innerHeight, margins, yTemp));
+			}
+			// Adds feels alike temperature
 			if (this.config.showFeelsLikeTemp) {
-				this.svgAddFeelsAlikeTemperature(svg, sortedData, xTime, yTemp);
+				promises.push(this.svgAddFeelsAlikeTemperature(svg, sortedData, xTime, innerWidth, innerHeight, margins, yTemp));
 			}
-
-			// Add weather icons
+			// Adds weather icons
 			if (this.config.showIcons) {
-				this.svgAddWeatherIcons(svg, sortedData, xTime);
+				promises.push(this.svgAddWeatherIcons(svg, sortedData, xTime, innerWidth, innerHeight, margins));
+			}
+			// Adds AQI
+			if (this.config.showAQI) {
+				promises.push(this.svgAddAqi(svg, sortedData, xTime, innerWidth, innerHeight, margins));
+			}
+			// Adds Humidity
+			if (this.config.showHumidity) {
+				promises.push(this.svgAddHumidity(svg, sortedData, xTime, innerWidth, innerHeight, margins));
+			}
+			// Adds Wind
+			if (this.config.showWind) {
+				promises.push(this.svgAddWind(svg, sortedData, xTime, innerWidth, innerHeight, margins));
+			}
+			// Adds UVI
+			if (this.config.showUVI) {
+				promises.push(this.svgAddUvi(svg, sortedData, xTime, innerWidth, innerHeight, margins));
 			}
 		}
 
 		// SVG is directly added into div module
-		return document.createElement("div");
+		return Promise.all(promises).then(() => document.createElement("div"));
+	},
+
+	/**
+	 * Returns an array without intermediate values (only local min and max values)
+	 * @param {Array} data Array to filter
+	 * @param {Function} fctGet Function to be called with an item of data to get value 
+	 * @param {Number} minDelta Minimum delta between 2 values to keep it - undefined to ignore
+	 * @returns {Array} data with only local min/max values
+	 */
+	keepExtremes: function (data, fctGet, minDelta) {
+		let direction = data.length <= 1 || fctGet(data[1]) > fctGet(data[0]) ? -1 : 1;
+		const result = [];
+		let lastValue = Number.MAX_SAFE_INTEGER;
+		for (let i = 1; i < data.length; i++) {
+			const d0 = fctGet(data[i - 1]);
+			const d1 = fctGet(data[i]);
+			if (i == data.length - 1 || (direction > 0 && d1 < d0) || (direction < 0 && d1 > d0)) {
+				direction *= -1;
+				if (minDelta === undefined || Math.abs(d0 - lastValue) > minDelta) {
+					lastValue = d0;
+					result.push(data[i - 1]);
+				}
+			}
+		}
+		return result;
 	},
 
 	/**
@@ -305,13 +350,11 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {Array} dataHourly Data of weatherHourly
 	 * @param {Array} dataDaily Data of weatherDaily
 	 * @param {d3.scaleTime} xTime X-axis scale (time)
-	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
 	 * @param {integer} innerHeight Height of the chart (in pixels)
-	 * @param {integer} margin Margin of the chart (in pixels)
 	 * @param {integer} legendBarWidth Width of the legend (in pixels)
 	 */
-	addGridAndAxis: function (svg, dataHourly, dataDaily, xTime, yTemp, innerHeight, margin, legendBarWidth) {
-		// Add X axis (date)
+	addGridAndAxis: async function (svg, dataHourly, dataDaily, xTime, innerHeight, legendBarWidth) {
+		// X axis (date)
 		svg.append("g")
 			.attr("id", "x-axis-hours")
 			.attr("class", "x-axis")
@@ -319,17 +362,17 @@ Module.register("MMM-WeatherChartD3", {
 			.call(d3.axisBottom(xTime)
 				.tickValues(d3.timeHour.every(3).range(d3.min(dataHourly, d => d.date), d3.max(dataHourly, d => d.date))
 					.concat(d3.timeHour.every(6).range(d3.min(dataDaily, d => d.date), d3.max(dataDaily, d => d.date))))
-				.tickFormat(d3.timeFormat('%Hh'))
+				.tickFormat(d3.timeFormat("%Hh"))
 			);
 
 		// Rotate hours legend
 		svg.selectAll("#x-axis-hours text")
-			.style("text-anchor", "end")
-			.attr("dx", "-.8em")
-			.attr("dy", ".15em")
+			.attr("text-anchor", "end")
+			.attr("dx", "-0.8em")
+			.attr("dy", "0.15em")
 			.attr("transform", "rotate(-65)");
 
-		// Add X gridline
+		// X gridline
 		svg.append("g")
 			.attr("id", "x-axis-days")
 			.attr("class", "x-axis-grid")
@@ -337,22 +380,9 @@ Module.register("MMM-WeatherChartD3", {
 			.call(d3.axisBottom(xTime)
 				.ticks(d3.timeDay.every(1))
 				.tickSize(-innerHeight, 0, 0).tickPadding(legendBarWidth)
-				.tickFormat(d3.timeFormat('%a %d')))
+				.tickFormat(d3.timeFormat("%a %d")))
 			// Shift text to start of tick
-			.selectAll("text").style("text-anchor", "start");
-
-		svg.append("g")
-			.attr("class", "y-axis")
-			.call(d3.axisLeft(yTemp));
-
-		// Y axis (temperature) label
-		svg.append("text")
-			.style("text-anchor", "end")
-			.attr("class", "y-axis-label")
-			.attr("x", -margin.left)
-			.attr("y", -10)
-			.attr("text-anchor", "start")
-			.text(this.config.units === "imperial" ? "°F" : "°C");
+			.selectAll("text").attr("text-anchor", "start");
 	},
 
 	/**
@@ -362,28 +392,26 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {d3.scaleTime} xTime X-axis scale (time)
 	 * @param {integer} innerWidth Width of the chart (in pixels)
 	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 */
-	svgAddDayNight: function (svg, sortedData, xTime, innerWidth, innerHeight) {
+	svgAddDayNight: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
 		let sunTimesData = [];
 		var iterd = sortedData[0].date;
 		while (iterd <= sortedData[sortedData.length - 1].date) {
 			sunTimesData.push(SunCalc.getTimes(iterd, this.config.lat, this.config.lon));
-			iterd = iterd.clone().add(1, 'd');
+			iterd = iterd.clone().add(1, "d");
 		}
 
 		const fctNightWidth = (d1, d2) => Math.min(innerWidth, d2 ? xTime(d2.sunrise) : innerWidth) - Math.max(0, xTime(d1.sunset));
 
-		svg.selectAll("grp")
-			.append("g")
-			.data(sunTimesData)
-			.enter()
+		svg.selectAll("grp").append("g")
+			.data(sunTimesData).enter()
 			.append("rect")
 			.attr("class", "night")
 			.attr("x", d => Math.max(xTime(d.sunset), 0))
 			.attr("y", -this.config.iconSize)
 			.attr("width", (d, i) => fctNightWidth(d, sunTimesData[i + 1]))
-			.attr("height", innerHeight + this.config.iconSize)
-			.attr('opacity', 0.05);
+			.attr("height", innerHeight + this.config.iconSize);
 	},
 
 	/**
@@ -391,75 +419,119 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {svg} svg SVG of the chart
 	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
 	 * @param {d3.scaleTime} xTime X-axis scale (time)
-	 * @param {d3.scaleLinear} yPrecip Y-axis scale (precipitations)
 	 * @param {integer} innerWidth Width of the chart (in pixels)
-	 * @param {integer} margin Margin of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 */
-	svgAddPrecipitation: function (svg, sortedData, xTime, yPrecip, innerWidth, margin) {
-		// Add Y axis (rain)
+	svgAddPrecipitation: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+		let data = sortedData.filter(d => d.precipitation !== undefined);
+
+		// Add slot duration in ms
+		data.forEach((d, i) => d.period = Math.abs(d.date.diff(data[i + (i + 1 < data.length ? 1 : -1)].date)));
+
+		data = data.filter(d => d.precipitation !== null);
+		const getValue = d => parseFloat(d.precipitation.toFixed(1));
+
+		/*
+		// Y axis
 		svg.append("g")
 			.attr("class", "y-axis")
 			.attr("transform", `translate(${innerWidth}, 0)`)
-			.call(d3.axisRight(yPrecip));
+			.call(d3.axisRight(yAxis));
+		*/
 
-		// Y axis (rain) label
-		svg.append("text")
-			.attr("class", "y-axis-label")
-			.attr("x", innerWidth + margin.left)
-			.attr("y", -10)
-			.attr("text-anchor", "start")
-			.text(this.config.units === "imperial" ? "in" : "mm");
+		if (data.length > 0) {
+			const self = this;
+			const getHeightPrecipitation = function (d, isSnow) {
+				const deltaInHours = d.period / (60 * 60 * 1000); // ms to hours
+				const precipitations = self.config.showSnow ? (self.ifNan(isSnow ? d.snow : d.rain, 0)) : (isSnow ? 0 : d.precipitation);
+				return precipitations / deltaInHours;
+			}
 
-		// Add rain/precipitations
-		svg.append("path")
-			.attr("id", "precipitation")
-			.datum(sortedData)
-			.attr("fill", this.config.fillColor)
-			.attr("stroke", this.config.color)
-			.attr("stroke-width", 1.5)
-			.attr('opacity', 1)
-			.attr("d", d3.area().curve(d3.curveMonotoneX)
-				.x(d => xTime(d.date))
-				.y0(d => yPrecip(0))
-				.y1(d => yPrecip(this.config.showSnow ? this.ifNan(d.rain, 0) : this.ifNan(d.precipitation, 0))) // Include snow if not displayed separately
-			);
+			const maxPrecipitations = d3.max(data, d => getHeightPrecipitation(d, false));
+			const minDelta = d3.min(data, d => d.period);
 
-		if (this.config.showSnow) {
-			// Add snow
-			svg.append("path")
-				.attr("id", "snow")
-				.datum(sortedData)
-				.attr("fill", this.config.fillColor)
-				.attr("stroke", this.config.color)
-				.attr("stroke-dasharray", "10,2")
-				.attr("stroke-width", 1)
-				.attr('opacity', 0.7)
-				.attr("d", d3.area().curve(d3.curveMonotoneX)
-					.x(d => xTime(d.date))
-					.y0(d => yPrecip(0))
-					.y1(d => yPrecip(this.ifNan(d.snow, 0)))
-				);
+			const yAxis = d3.scaleLinear()
+				.domain([0, Math.max(5 / (minDelta / (60 * 60 * 1000)), maxPrecipitations)]) // world record: ~300mm for an hour
+				.range([innerHeight, 0]);
+
+			// Y axis icon
+			svg.append("image")
+				.attr("class", "precipitation axis-icon")
+				.attr("x", -this.config.iconSize / 2)
+				.attr("y", yAxis(maxPrecipitations) - this.config.iconSize / 4)
+				.attr("xlink:href", `${this.config.iconURLBase}/wi-raindrop.svg`)
+				.attr("width", this.config.iconSize / 2);
+
+			// Y axis (rain) label
+			svg.append("text")
+				.attr("class", "rain axis-label")
+				.attr("x", innerWidth + margins.left)
+				.attr("y", yAxis(getValue(data[data.length - 1])))
+				.attr("text-anchor", "start")
+				.text(this.config.units === "imperial" ? "in/h" : "mm/h");
+
+			// Rain/precipitations
+			svg.selectAll("grp").append("g")
+				.data(data).enter()
+				.append("rect")
+				.attr("class", "precipitation curve")
+				.attr("x", d => xTime(d.date))
+				.attr("y", yAxis(0))
+				.attr("transform", d => `translate(0, ${-yAxis(0) + yAxis(getHeightPrecipitation(d, false) + getHeightPrecipitation(d, true))})`)
+				.attr("width", d => Math.min(innerWidth + margins.left, xTime(d.date + d.period)) - xTime(d.date))
+				.attr("height", d => yAxis(0) - yAxis(getHeightPrecipitation(d, false))); // Include snow if not displayed separately
+
+			if (this.config.showSnow) {
+				// Snow
+				svg.selectAll("grp").append("g")
+					.data(data).enter()
+					.append("rect")
+					.attr("class", "snow curve")
+					.attr("x", d => xTime(d.date))
+					.attr("y", yAxis(0))
+					.attr("transform", d => `translate(0, ${-yAxis(0) + yAxis(getHeightPrecipitation(d, true))})`)
+					.attr("width", d => Math.min(innerWidth + margins.left, xTime(d.date + d.period)) - xTime(d.date))
+					.attr("height", d => yAxis(0) - yAxis(getHeightPrecipitation(d, true)));
+			}
+
+			// Precipitation probability
+			let getProba = "";
+			if (this.config.showPrecipitationProba) {
+				getProba = (d) => `${d.precipitationProba.toFixed(0)}%`;
+			}
+			
+			const dataExtremes = this.keepExtremes(data, d => getValue(d), 0.1);
+			// Local min/max values as text
+			svg.selectAll("grp")
+				.data(dataExtremes).enter()
+				.append("text")
+				.attr("class", "precipitation curve-value")
+				.attr("text-anchor", "start")
+				.attr("x", d => xTime(d.date))
+				.attr("y", d => yAxis(getHeightPrecipitation(d, false) + getHeightPrecipitation(d, true)))
+				.text(d => `${(getHeightPrecipitation(d, false) + getHeightPrecipitation(d, true)).toFixed(1)} ${getProba(d)}`);
 		}
 	},
 
 	/**
-	 * Add min/max temperature to SVG
+	 * Adds min/max temperature to SVG
 	 * @param {svg} svg SVG of the chart
 	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
 	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
 	 */
-	svgAddTemperatureMinMax: function (svg, sortedData, xTime, yTemp) {
+	svgAddTemperatureMinMax: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins, yTemp) {
 		svg.append("path")
-			.attr("id", "min-max-temperature")
-			.datum(sortedData.filter(d => (d.minTemperature !== null) && (d.maxTemperature !== null)))
-			.attr("fill", this.config.fillColor)
-			.attr("stroke", this.config.color)
-			.attr("stroke-width", 1.5)
-			.attr("d", d3.area().curve(d3.curveNatural)
+			.datum(sortedData.filter(d => d.minTemperature && d.minTemperature !== null && d.minTemperature && d.minTemperature !== null))
+			.attr("class", "min-max-temperature curve")
+			.attr("d", d3.area().curve(d3.curveCardinal.tension(0.3))
 				.x(d => xTime(d.date))
-				.y0(d => yTemp(d.minTemperature))
-				.y1(d => yTemp(d.maxTemperature))
+				.y0(d => yTemp(parseFloat(d.minTemperature.toFixed(1))))
+				.y1(d => yTemp(parseFloat(d.maxTemperature.toFixed(1))))
 			);
 	},
 
@@ -468,19 +540,58 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {svg} svg SVG of the chart
 	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
 	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
 	 */
-	svgAddTemperature: function (svg, sortedData, xTime, yTemp) {
+	svgAddTemperature: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins, yTemp) {
+		const data = sortedData.filter(d => d.temperature && d.temperature !== null);
+		const getValue = d => parseFloat(d.temperature.toFixed(1));
+
+		/*
+		// Y axis
+		svg.append("g")
+			.attr("class", "y-axis")
+			.call(d3.axisLeft(yTemp));
+		*/
+
+		// Y axis icon
+		svg.append("image")
+			.attr("class", "temperature axis-icon")
+			.attr("x", -this.config.iconSize / 2)
+			.attr("y", yTemp(getValue(data[0])) - this.config.iconSize / 4)
+			.attr("xlink:href", `${this.config.iconURLBase}/wi-thermometer.svg`)
+			.attr("width", this.config.iconSize / 2);
+
+		// Y axis label
+		svg.append("text")
+			.attr("class", "temperature axis-label")
+			.attr("text-anchor", "start")
+			.attr("x", innerWidth + margins.left)
+			.attr("y", yTemp(getValue(data[data.length - 1])))
+			.text(this.config.units === "imperial" ? "°F" : "°C");
+
+		// Curve
 		svg.append("path")
-			.attr("id", "temperature")
-			.datum(sortedData.filter(d => (d.temperature !== null)))
-			.attr("fill", "none")
-			.attr("stroke", this.config.color)
-			.attr("stroke-width", 1.5)
-			.attr("d", d3.line().curve(d3.curveNatural)
+			.datum(data)
+			.attr("class", "temperature curve")
+			.attr("d", d3.line().curve(d3.curveCardinal.tension(0.3))
 				.x(d => xTime(d.date))
-				.y(d => yTemp(d.temperature))
+				.y(d => yTemp(getValue(d)))
 			);
+
+		const dataExtremes = this.keepExtremes(data, d => getValue(d), 1);
+		// Local min/max values as text
+		svg.selectAll("grp")
+			.data(dataExtremes).enter()
+			.append("text")
+			.attr("class", "temperature curve-value")
+			.attr("text-anchor", "middle")
+			.attr("x", d => xTime(d.date))
+			.attr("y", d => yTemp(getValue(d)))
+			.attr("dy", (d, i) => `${((i > 0 && getValue(d) > getValue(dataExtremes[i - 1])) || (i == 0 && getValue(d) > getValue(dataExtremes[i + 1]))) ? -0.75 : 1.5}em`)
+			.text(d => getValue(d));
 	},
 
 	/**
@@ -488,19 +599,22 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {svg} svg SVG of the chart
 	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
 	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 * @param {d3.scaleLinear} yTemp Y-axis scale (temperature)
 	 */
-	svgAddFeelsAlikeTemperature: function (svg, sortedData, xTime, yTemp) {
+	svgAddFeelsAlikeTemperature: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins, yTemp) {
+		const data = sortedData.filter(d => d.feelsLikeTemp && d.feelsLikeTemp !== null);
+		const getValue = d => parseFloat(d.feelsLikeTemp.toFixed(1));
+
+		// Curve
 		svg.append("path")
-			.attr("id", "feelsLikeTemp")
-			.datum(sortedData.filter(d => (d.feelsLikeTemp !== null)))
-			.attr("fill", "none")
-			.attr("stroke", this.config.color)
-			.attr("stroke-width", 1.5)
-			.attr("stroke-dasharray", "5, 5")
-			.attr("d", d3.line().curve(d3.curveNatural)
+			.datum(data)
+			.attr("class", "feelsLikeTemp curve")
+			.attr("d", d3.line().curve(d3.curveCardinal.tension(0.3))
 				.x(d => xTime(d.date))
-				.y(d => yTemp(d.feelsLikeTemp))
+				.y(d => yTemp(getValue(d)))
 			);
 	},
 
@@ -509,11 +623,14 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {svg} svg SVG of the chart
 	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
 	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 */
-	svgAddWeatherIcons: function (svg, sortedData, xTime) {
+	svgAddWeatherIcons: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins,) {
 		let lastIcon = undefined; // static
 		function differentThanPrevious(d) {
-			const res = lastIcon !== d.weatherType;
+			const res = d.weatherType && lastIcon !== d.weatherType;
 			lastIcon = d.weatherType;
 			return res;
 		}
@@ -522,7 +639,7 @@ Module.register("MMM-WeatherChartD3", {
 		let lastPosNb = 1;
 		let sumLastStack = 0;
 		// Un-align icons if previous is too close
-		function fctIconY(d, i) {
+		function yAxis(d, i) {
 			let nb = 1;
 			if (i > 0) {
 				nb = (xTime(d.date) - xTime(dataIcons[i - 1].date)) / this.config.iconSize;
@@ -537,16 +654,206 @@ Module.register("MMM-WeatherChartD3", {
 			}
 		}
 
-		svg.selectAll("grp")
-			.append("g")
-			.attr("class", "weather-icons")
-			.data(dataIcons)
-			.enter()
-			.append("image") // Adding text with class wi weathericon does not work, so: using svg instead
+		// Icons
+		svg.selectAll("grp").append("g")
+			.data(dataIcons).enter()
+			.append("image") // NB: Adding text with classes "wi weathericon" does not work, so: using svg instead
+			.attr("class", "weather curve")
 			.attr("xlink:href", d => `${this.config.iconURLBase}/wi-${d.weatherType}.svg`)
-			.attr("width", this.config.iconSize)
 			.attr("x", d => xTime(d.date))
-			.attr("y", fctIconY.bind(this));
+			.attr("y", yAxis.bind(this))
+			.attr("width", this.config.iconSize);
+	},
+
+	/**
+	 * Adds pressure to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
+	 */
+	svgAddPressure: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+		const data = sortedData.filter(d => d.pressure && d.pressure !== null);
+		const getValue = d => parseFloat(d.pressure.toFixed(0));
+
+		const yAxis = d3.scaleLinear()
+			.domain([Math.min(950, d3.min(data, d => getValue(d))), Math.max(1050, d3.max(data, d => getValue(d)))])
+			.range([innerHeight, 0]);
+
+		// Y axis icon
+		svg.append("image")
+			.attr("class", "pressure axis-icon")
+			.attr("x", -this.config.iconSize / 2)
+			.attr("y", yAxis(getValue(data[0])) - this.config.iconSize / 4)
+			.attr("xlink:href", `${this.config.iconURLBase}/wi-barometer.svg`)
+			.attr("width", this.config.iconSize / 2);
+
+		// Y axis label
+		svg.append("text")
+			.attr("class", "pressure axis-label")
+			.attr("text-anchor", "start")
+			.attr("x", innerWidth + margins.left)
+			.attr("y", yAxis(getValue(data[data.length - 1])))
+			.text("hPa");
+
+		// Curve
+		svg.append("path")
+			.datum(data)
+			.attr("class", "pressure curve")
+			.attr("d", d3.line().curve(d3.curveCardinal.tension(0.3))
+				.x(d => xTime(d.date))
+				.y(d => yAxis(getValue(d)))
+			);
+
+		const dataExtremes = this.keepExtremes(data, d => getValue(d), 1);
+		// Local min/max values as text
+		svg.selectAll("grp")
+			.data(dataExtremes).enter()
+			.append("text")
+			.attr("class", "pressure curve-value")
+			.attr("text-anchor", "middle")
+			.attr("x", d => xTime(d.date))
+			.attr("y", d => yAxis(getValue(d)))
+			.attr("dy", (d, i) => `${(i > 0 && getValue(d) > getValue(dataExtremes[i - 1])) ? -0.75 : 1}em`)
+			.text(d => getValue(d));
+	},
+
+	/**
+	 * Adds humidity to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
+	 */
+	svgAddHumidity: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+		const data = sortedData.filter(d => d.humidity && d.humidity !== null);
+		const getValue = d => parseFloat(d.humidity.toFixed(0));
+
+		const yAxis = d3.scaleLinear()
+			.domain([0, 100])
+			.range([innerHeight, 0]);
+
+		// Y axis icon
+		svg.append("image")
+			.attr("class", "humidity axis-icon")
+			.attr("x", -this.config.iconSize / 2)
+			.attr("y", yAxis(getValue(data[0])) - this.config.iconSize / 4)
+			.attr("xlink:href", `${this.config.iconURLBase}/wi-humidity.svg`)
+			.attr("width", this.config.iconSize / 2);
+
+		// Y axis label
+		svg.append("text")
+			.attr("class", "humidity axis-label")
+			.attr("text-anchor", "start")
+			.attr("x", innerWidth + margins.left)
+			.attr("y", yAxis(getValue(data[data.length - 1])))
+			.text("%");
+
+		// Curve
+		svg.append("path")
+			.datum(data)
+			.attr("class", "humidity curve")
+			.attr("d", d3.line().curve(d3.curveCardinal.tension(0.3))
+				.x(d => xTime(d.date))
+				.y(d => yAxis(getValue(d)))
+			);
+
+		const dataExtremes = this.keepExtremes(data, d => getValue(d), 4);
+		// Local min/max values as text
+		svg.selectAll("grp")
+			.data(dataExtremes).enter()
+			.append("text")
+			.attr("class", "humidity curve-value")
+			.attr("text-anchor", "middle")
+			.attr("x", d => xTime(d.date))
+			.attr("y", d => yAxis(getValue(d)))
+			.attr("dy", (d, i) => `${(i > 0 && getValue(d) > getValue(dataExtremes[i - 1])) ? -0.75 : 1}em`)
+			.text(d => getValue(d));
+	},
+
+	/**
+	 * Adds wind to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
+	 */
+	svgAddWind: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+		const data = sortedData.filter(d => d.windSpeed && d.windSpeed !== null);
+		const getValue = d => parseFloat(d.windSpeed.toFixed(0));
+
+		const yAxis = d3.scaleLinear()
+			.domain([0, Math.max(50, d3.max(data, d => getValue(d)))])
+			.range([innerHeight, 0]);
+
+		// Y axis icon
+		svg.append("image")
+			.attr("class", "wind axis-icon")
+			.attr("x", -this.config.iconSize / 2)
+			.attr("y", yAxis(getValue(data[0])) - this.config.iconSize / 4)
+			.attr("xlink:href", `${this.config.iconURLBase}/wi-strong-wind.svg`)
+			.attr("width", this.config.iconSize / 2);
+
+		// Y axis label
+		svg.append("text")
+			.attr("class", "wind axis-label")
+			.attr("text-anchor", "start")
+			.attr("x", innerWidth + margins.left)
+			.attr("y", yAxis(getValue(data[data.length - 1])))
+			.text(this.config.units === "imperial" ? "mi/h" : "km/h");
+
+		// Curve
+		svg.append("path")
+			.datum(data)
+			.attr("class", "wind curve")
+			.attr("d", d3.line().curve(d3.curveCardinal.tension(0.3))
+				.x(d => xTime(d.date))
+				.y(d => yAxis(getValue(d)))
+			);
+
+		const dataExtremes = this.keepExtremes(data, d => getValue(d), 1);
+		// Local min/max values as text
+		svg.selectAll("grp")
+			.data(dataExtremes).enter()
+			.append("text")
+			.attr("class", "wind curve-value")
+			.attr("text-anchor", "middle")
+			.attr("x", d => xTime(d.date))
+			.attr("y", d => yAxis(getValue(d)))
+			.attr("dy", (d, i) => `${(i > 0 && getValue(d) > getValue(dataExtremes[i - 1])) ? -0.75 : 1}em`)
+			.text(d => getValue(d));
+	},
+
+	/**
+	 * Adds AQI to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
+	 */
+	svgAddAqi: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+		console.log("TODO: implement svgAddAqi");
+	},
+
+	/**
+	 * Adds UVI to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
+	 */
+	svgAddUvi: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+		console.log("TODO: implement svgAddUvi");
 	},
 
 });
