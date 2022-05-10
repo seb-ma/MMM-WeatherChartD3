@@ -219,7 +219,7 @@ Module.register("MMM-WeatherChartD3", {
 				let domainX = [d3.min(dataHourly, d => d.date), d3.max(dataDaily, d => d.date)];
 				if (this.ifNan(this.config.hoursRatio, 0) !== 0) {
 					rangeX = [0, innerWidth * (1 - this.config.hoursRatio), innerWidth];
-					domainX = [d3.min(dataHourly, d => d.date), d3.max(dataHourly, d => d.date), d3.max(dataDaily, d => d.date)];
+					domainX = [d3.min(dataHourly, d => d.date), d3.min(dataDaily, d => d.date), d3.max(dataDaily, d => d.date)];
 				}
 				xTime = d3.scaleTime()
 					.domain(domainX)
@@ -430,7 +430,13 @@ Module.register("MMM-WeatherChartD3", {
 		data.forEach((d, i) => d.period = Math.abs(d.date.diff(data[i + (i + 1 < data.length ? 1 : -1)].date)));
 
 		data = data.filter(d => d.precipitation !== null);
-		const getValue = d => parseFloat(d.precipitation.toFixed(1));
+
+		const self = this;
+		const getHeightPrecipitation = function (d, withRain = true, withSnow = true) {
+			const deltaInHours = d.period / (60 * 60 * 1000); // ms to hours
+			const precipitations = (withRain ? d.rain : 0) + (withSnow ? d.snow : 0);
+			return parseFloat((precipitations / deltaInHours).toFixed(2));
+		}
 
 		/*
 		// Y axis
@@ -441,18 +447,11 @@ Module.register("MMM-WeatherChartD3", {
 		*/
 
 		if (data.length > 0) {
-			const self = this;
-			const getHeightPrecipitation = function (d, isSnow) {
-				const deltaInHours = d.period / (60 * 60 * 1000); // ms to hours
-				const precipitations = self.config.showSnow ? (self.ifNan(isSnow ? d.snow : d.rain, 0)) : (isSnow ? 0 : d.precipitation);
-				return precipitations / deltaInHours;
-			}
-
-			const maxPrecipitations = d3.max(data, d => getHeightPrecipitation(d, false));
+			const maxPrecipitations = d3.max(data, d => getHeightPrecipitation(d));
 			const minDelta = d3.min(data, d => d.period);
 
 			const yAxis = d3.scaleLinear()
-				.domain([0, Math.max(5 / (minDelta / (60 * 60 * 1000)), maxPrecipitations)]) // world record: ~300mm for an hour
+				.domain([0, Math.max(5, maxPrecipitations)]) // world record: ~300mm for an hour
 				.range([innerHeight, 0]);
 
 			// Y axis icon
@@ -467,7 +466,7 @@ Module.register("MMM-WeatherChartD3", {
 			svg.append("text")
 				.attr("class", "rain axis-label")
 				.attr("x", innerWidth + margins.left)
-				.attr("y", yAxis(getValue(data[data.length - 1])))
+				.attr("y", yAxis(getHeightPrecipitation(data[data.length - 1])))
 				.attr("text-anchor", "start")
 				.text(this.config.units === "imperial" ? "in/h" : "mm/h");
 
@@ -478,30 +477,30 @@ Module.register("MMM-WeatherChartD3", {
 				.attr("class", "precipitation curve")
 				.attr("x", d => xTime(d.date))
 				.attr("y", yAxis(0))
-				.attr("transform", d => `translate(0, ${-yAxis(0) + yAxis(getHeightPrecipitation(d, false) + getHeightPrecipitation(d, true))})`)
-				.attr("width", d => Math.min(innerWidth + margins.left, xTime(d.date + d.period)) - xTime(d.date))
-				.attr("height", d => yAxis(0) - yAxis(getHeightPrecipitation(d, false))); // Include snow if not displayed separately
+				.attr("transform", d => `translate(0, ${-yAxis(0) + yAxis(getHeightPrecipitation(d, true, !this.config.showSnow))})`)
+				.attr("width", d => Math.min(innerWidth, xTime(d.date + d.period)) - xTime(d.date))
+				.attr("height", d => yAxis(0) - yAxis(getHeightPrecipitation(d, true, !this.config.showSnow)));
 
 			if (this.config.showSnow) {
 				// Snow
 				svg.selectAll("grp").append("g")
-					.data(data).enter()
+					.data(data.filter(d => d.snow && d.snow !== null)).enter()
 					.append("rect")
 					.attr("class", "snow curve")
 					.attr("x", d => xTime(d.date))
 					.attr("y", yAxis(0))
-					.attr("transform", d => `translate(0, ${-yAxis(0) + yAxis(getHeightPrecipitation(d, true))})`)
-					.attr("width", d => Math.min(innerWidth + margins.left, xTime(d.date + d.period)) - xTime(d.date))
-					.attr("height", d => yAxis(0) - yAxis(getHeightPrecipitation(d, true)));
+					.attr("transform", d => `translate(0, ${-yAxis(0) + yAxis(getHeightPrecipitation(d, false, true))})`)
+					.attr("width", d => Math.min(innerWidth, xTime(d.date + d.period)) - xTime(d.date))
+					.attr("height", d => yAxis(0) - yAxis(getHeightPrecipitation(d, false, true)));
 			}
 
 			// Precipitation probability
 			let getProba = "";
 			if (this.config.showPrecipitationProba) {
-				getProba = (d) => `${d.precipitationProba.toFixed(0)}%`;
+				getProba = (d) => `(${d.precipitationProba.toFixed(0)}%)`;
 			}
 			
-			const dataExtremes = this.keepExtremes(data, d => getValue(d), 0.1);
+			const dataExtremes = this.keepExtremes(data, d => getHeightPrecipitation(d), 0.1);
 			// Local min/max values as text
 			svg.selectAll("grp")
 				.data(dataExtremes).enter()
@@ -509,8 +508,8 @@ Module.register("MMM-WeatherChartD3", {
 				.attr("class", "precipitation curve-value")
 				.attr("text-anchor", "start")
 				.attr("x", d => xTime(d.date))
-				.attr("y", d => yAxis(getHeightPrecipitation(d, false) + getHeightPrecipitation(d, true)))
-				.text(d => `${(getHeightPrecipitation(d, false) + getHeightPrecipitation(d, true)).toFixed(1)} ${getProba(d)}`);
+				.attr("y", d => yAxis(getHeightPrecipitation(d)))
+				.text(d => `${(getHeightPrecipitation(d)).toFixed(1)} ${getProba(d)}`);
 		}
 	},
 
