@@ -197,6 +197,7 @@ Module.register("MMM-WeatherChartD3", {
 
 		const dataHourly = ifDef(this.weatherProvider.weatherHourly(), []);
 		let dataDaily = ifDef(this.weatherProvider.weatherForecast(), []);
+		const dataPollution = ifDef(this.weatherProvider.pollutionForecast(), []);
 
 		if (dataHourly.length > 0 || dataDaily.length > 0) {
 			if (dataHourly.length > 0 && dataDaily.length > 0) {
@@ -271,7 +272,7 @@ Module.register("MMM-WeatherChartD3", {
 
 			// Adds day/night
 			if (this.config.showNights && sortedData.length > 1) {
-				promises.push(this.svgAddDayNight(svg, sortedData, xTime, innerWidth, innerHeight, margins));
+				promises.push(this.svgAddDayNight(svg, sortedData, xTime, innerWidth, innerHeight, margins, legendBarWidth));
 			}
 			// Adds precipitation (rain/snow)
 			if (this.config.showPrecipitation) {
@@ -297,10 +298,6 @@ Module.register("MMM-WeatherChartD3", {
 			if (this.config.showIcons) {
 				promises.push(this.svgAddWeatherIcons(svg, sortedData, xTime, innerWidth, innerHeight, margins));
 			}
-			// Adds AQI
-			if (this.config.showAQI) {
-				promises.push(this.svgAddAqi(svg, sortedData, xTime, innerWidth, innerHeight, margins));
-			}
 			// Adds Humidity
 			if (this.config.showHumidity) {
 				promises.push(this.svgAddHumidity(svg, sortedData, xTime, innerWidth, innerHeight, margins));
@@ -312,6 +309,10 @@ Module.register("MMM-WeatherChartD3", {
 			// Adds UVI
 			if (this.config.showUVI) {
 				promises.push(this.svgAddUvi(svg, sortedData, xTime, innerWidth, innerHeight, margins));
+			}
+			// Adds AQI
+			if (this.config.showAQI) {
+				promises.push(this.svgAddAqi(svg, dataPollution, xTime, innerWidth, innerHeight, margins));
 			}
 		}
 
@@ -328,9 +329,10 @@ Module.register("MMM-WeatherChartD3", {
 	 */
 	keepExtremes: function (data, fctGet, minDelta) {
 		let direction = data.length <= 1 || fctGet(data[1]) > fctGet(data[0]) ? -1 : 1;
+		const startIndexToDisplay = 2; // Don't keep first value to avoid display on left axis
 		const result = [];
 		let lastValue = Number.MAX_SAFE_INTEGER;
-		for (let i = 1; i < data.length; i++) {
+		for (let i = startIndexToDisplay; i < data.length; i++) {
 			const d0 = fctGet(data[i - 1]);
 			const d1 = fctGet(data[i]);
 			if (i == data.length - 1 || (direction > 0 && d1 < d0) || (direction < 0 && d1 > d0)) {
@@ -394,7 +396,7 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {integer} innerHeight Height of the chart (in pixels)
 	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 */
-	svgAddDayNight: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+	svgAddDayNight: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins, legendBarWidth) {
 		let sunTimesData = [];
 		var iterd = sortedData[0].date;
 		while (iterd <= sortedData[sortedData.length - 1].date) {
@@ -404,6 +406,7 @@ Module.register("MMM-WeatherChartD3", {
 
 		const fctNightWidth = (d1, d2) => Math.min(innerWidth, d2 ? xTime(d2.sunrise) : innerWidth) - Math.max(0, xTime(d1.sunset));
 
+		// In graph
 		svg.selectAll("grp").append("g")
 			.data(sunTimesData).enter()
 			.append("rect")
@@ -412,6 +415,15 @@ Module.register("MMM-WeatherChartD3", {
 			.attr("y", -this.config.iconSize)
 			.attr("width", (d, i) => fctNightWidth(d, sunTimesData[i + 1]))
 			.attr("height", innerHeight + this.config.iconSize);
+		// In axis
+		svg.selectAll("grp").append("g")
+			.data(sunTimesData).enter()
+			.append("rect")
+			.attr("class", "axis-night")
+			.attr("x", d => Math.max(xTime(d.sunset), 0))
+			.attr("y", innerHeight)
+			.attr("width", (d, i) => fctNightWidth(d, sunTimesData[i + 1]))
+			.attr("height", legendBarWidth);
 	},
 
 	/**
@@ -495,12 +507,12 @@ Module.register("MMM-WeatherChartD3", {
 			}
 
 			// Precipitation probability
-			let getProba = "";
+			let getProba = (d) => "";
 			if (this.config.showPrecipitationProba) {
 				getProba = (d) => `(${d.precipitationProba.toFixed(0)}%)`;
 			}
-			
-			const dataExtremes = this.keepExtremes(data, d => getHeightPrecipitation(d), 0.1);
+
+			const dataExtremes = this.keepExtremes(data, d => getHeightPrecipitation(d), 0.5);
 			// Local min/max values as text
 			svg.selectAll("grp")
 				.data(dataExtremes).enter()
@@ -830,19 +842,6 @@ Module.register("MMM-WeatherChartD3", {
 	},
 
 	/**
-	 * Adds AQI to SVG
-	 * @param {svg} svg SVG of the chart
-	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
-	 * @param {d3.scaleTime} xTime X-axis scale (time)
-	 * @param {integer} innerWidth Width of the chart (in pixels)
-	 * @param {integer} innerHeight Height of the chart (in pixels)
-	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
-	 */
-	svgAddAqi: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
-		console.log("TODO: implement svgAddAqi");
-	},
-
-	/**
 	 * Adds UVI to SVG
 	 * @param {svg} svg SVG of the chart
 	 * @param {Array} sortedData Concatenation of weatherHourly and weatherDaily
@@ -852,7 +851,104 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 */
 	svgAddUvi: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
-		console.log("TODO: implement svgAddUvi");
+		const data = sortedData.filter(d => d.uvi && d.uvi !== null);
+		const getValue = d => parseFloat(d.uvi.toFixed(1));
+
+		const yAxis = d3.scaleLinear()
+			.domain([0, Math.max(10, d3.max(data, d => getValue(d)))])
+			.range([innerHeight, 0]);
+
+		// Y axis icon
+		svg.append("image")
+			.attr("class", "uvi axis-icon")
+			.attr("x", -this.config.iconSize / 2)
+			.attr("y", yAxis(getValue(data[0])) - this.config.iconSize / 4)
+			.attr("xlink:href", `${this.config.iconURLBase}/wi-day-sunny.svg`)
+			.attr("width", this.config.iconSize / 2);
+
+		// Y axis label
+		svg.append("text")
+			.attr("class", "uvi axis-label")
+			.attr("text-anchor", "start")
+			.attr("x", innerWidth + margins.left)
+			.attr("y", yAxis(getValue(data[data.length - 1])))
+			.text("UV");
+
+		// Curve
+		svg.append("path")
+			.datum(data)
+			.attr("class", "uvi curve")
+			.attr("d", d3.line().curve(d3.curveCardinal.tension(0.3))
+				.x(d => xTime(d.date))
+				.y(d => yAxis(getValue(d)))
+			);
+
+		const dataExtremes = this.keepExtremes(data, d => getValue(d), 1);
+		// Local min/max values as text
+		svg.selectAll("grp")
+			.data(dataExtremes).enter()
+			.append("text")
+			.attr("class", "uvi curve-value")
+			.attr("text-anchor", "middle")
+			.attr("x", d => xTime(d.date))
+			.attr("y", d => yAxis(getValue(d)))
+			.attr("dy", (d, i) => `${(i > 0 && getValue(d) > getValue(dataExtremes[i - 1])) ? -0.75 : 1}em`)
+			.text(d => getValue(d));
+	},
+
+	/**
+	 * Adds AQI to SVG
+	 * @param {svg} svg SVG of the chart
+	 * @param {Array} sortedData pollutionForecast
+	 * @param {d3.scaleTime} xTime X-axis scale (time)
+	 * @param {integer} innerWidth Width of the chart (in pixels)
+	 * @param {integer} innerHeight Height of the chart (in pixels)
+	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
+	 */
+	svgAddAqi: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
+		const data = sortedData.filter(d => d.aqi && d.aqi !== null);
+		const getValue = d => parseFloat(d.aqi.toFixed(1));
+
+		const yAxis = d3.scaleLinear()
+			.domain([Math.max(5, d3.max(data, d => getValue(d))), Math.max(1, d3.min(data, d => getValue(d)))])
+			.range([innerHeight, 2 * this.config.iconSize]);
+
+		// Y axis icon
+		svg.append("image")
+			.attr("class", "aqi axis-icon")
+			.attr("x", -this.config.iconSize / 2)
+			.attr("y", yAxis(getValue(data[0])) - this.config.iconSize / 4)
+			.attr("xlink:href", `${this.config.iconURLBase}/wi-train.svg`)
+			.attr("width", this.config.iconSize / 2);
+
+		// Y axis label
+		svg.append("text")
+			.attr("class", "aqi axis-label")
+			.attr("text-anchor", "start")
+			.attr("x", innerWidth + margins.left)
+			.attr("y", yAxis(getValue(data[data.length - 1])))
+			.text("AQI");
+
+		// Curve
+		svg.append("path")
+			.datum(data)
+			.attr("class", "aqi curve")
+			.attr("d", d3.line().curve(d3.curveCardinal.tension(1))
+				.x(d => xTime(d.date))
+				.y(d => yAxis(getValue(d)))
+			);
+
+		const dataExtremes = this.keepExtremes(data, d => getValue(d), 0.5);
+		// Local min/max values as text
+		svg.selectAll("grp")
+			.data(dataExtremes).enter()
+			.append("text")
+			.attr("class", "aqi curve-value")
+			.attr("text-anchor", "middle")
+			.attr("x", d => xTime(d.date))
+			.attr("y", d => yAxis(getValue(d)))
+			.attr("dy", (d, i) => `${(i > 0 && getValue(d) > getValue(dataExtremes[i - 1])) ? 1 : -0.75}em`)
+			.text(d => getValue(d));
 	},
 
 });

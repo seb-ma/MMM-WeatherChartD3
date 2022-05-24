@@ -28,10 +28,14 @@
 	fill: none;
 	opacity: 1;
 	stroke: var(--MMM-WeatherChartD3-color);
-	stroke-width: 1.5;
+	stroke-width: 2;
 }
 
 .MMM-WeatherChartD3 .night {
+	opacity: 0.05;
+}
+
+.MMM-WeatherChartD3 .axis-night {
 	opacity: 0.05;
 }
 
@@ -62,4 +66,13 @@
 
 .MMM-WeatherChartD3 .feelsLikeTemp {
 	stroke-dasharray: 5, 5;
+}
+
+.MMM-WeatherChartD3 .uvi {
+	opacity: 0.2;
+	stroke-dasharray: 100, 20;
+}
+
+.MMM-WeatherChartD3 .aqi {
+	opacity: 0.2;
 }
