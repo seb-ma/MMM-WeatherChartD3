@@ -103,3 +103,5 @@ npm install --only=production
 
 This chart can have a fully customized style.
 Each item type have a specific class that can be overloaded in `custom.css`.
+
+![sample](images/sample-colors.png)
