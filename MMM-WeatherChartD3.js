@@ -41,8 +41,8 @@ Module.register("MMM-WeatherChartD3", {
 		showTemperature: true,
 		showMinMaxTemperature: false,
 		showFeelsLikeTemp: true,
-		showPrecipitation: true,
-		showPrecipitationProba: true, // Only used when showPrecipitation == true
+		showPrecipitationAmount: true,
+		showPrecipitationProbability: true, // Only used when showPrecipitationAmount == true
 		showSnow: true, // if false: snow is included in precipitations
 		showPressure: true,
 		showHumidity: true,
@@ -275,7 +275,7 @@ Module.register("MMM-WeatherChartD3", {
 				promises.push(this.svgAddDayNight(svg, sortedData, xTime, innerWidth, innerHeight, margins, legendBarWidth));
 			}
 			// Adds precipitation (rain/snow)
-			if (this.config.showPrecipitation) {
+			if (this.config.showPrecipitationAmount) {
 				promises.push(this.svgAddPrecipitation(svg, sortedData, xTime, innerWidth, innerHeight, margins));
 			}
 			// Adds pressure
@@ -436,17 +436,17 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 */
 	svgAddPrecipitation: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
-		let data = sortedData.filter(d => d.precipitation !== undefined);
+		let data = sortedData.filter(d => d.precipitationAmount !== undefined);
 
 		// Add slot duration in ms
 		data.forEach((d, i) => d.period = Math.abs(d.date.diff(data[i + (i + 1 < data.length ? 1 : -1)].date)));
 
-		data = data.filter(d => d.precipitation !== null);
+		data = data.filter(d => d.precipitationAmount !== null);
 
 		const self = this;
 		const getHeightPrecipitation = function (d, withRain = true, withSnow = true) {
 			const deltaInHours = d.period / (60 * 60 * 1000); // ms to hours
-			const precipitations = (withRain ? d.rain : 0) + (withSnow ? d.snow : 0);
+			const precipitations = (withRain ? d.rain ?? 0 : 0) + (withSnow ? d.snow ?? 0 : 0);
 			return parseFloat((precipitations / deltaInHours).toFixed(2));
 		}
 
@@ -508,8 +508,8 @@ Module.register("MMM-WeatherChartD3", {
 
 			// Precipitation probability
 			let getProba = (d) => "";
-			if (this.config.showPrecipitationProba) {
-				getProba = (d) => `(${d.precipitationProba.toFixed(0)}%)`;
+			if (this.config.showPrecipitationProbability) {
+				getProba = (d) => `(${d.precipitationProbability.toFixed(0)}%)`;
 			}
 
 			const dataExtremes = this.keepExtremes(data, d => getHeightPrecipitation(d), 0.5);
