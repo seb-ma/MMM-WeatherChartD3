@@ -25,8 +25,8 @@ Module.register("MMM-WeatherChartD3", {
 		weatherEndpoint: "/onecall",
 		type: "full", // Possible values: hourly, forecast (=daily) or specific value `full` which is a join of data from hourly+daily
 		apiKey: "",
-		lat: "",
-		lon: "",
+		lat: 0,
+		lon: 0,
 		lang: config.language,
 		units: config.units,
 		locale: config.locale,
@@ -68,7 +68,7 @@ Module.register("MMM-WeatherChartD3", {
 
 		// Loads D3 locale
 		(async () => {
-			await d3.json(`https://unpkg.com/d3-time-format@2/locale/${this.config.locale}.json`).then(function (locale) {
+			await d3.json(`https://unpkg.com/d3-time-format@4/locale/${this.config.locale}.json`).then(function (locale) {
 				d3.timeFormatDefaultLocale(locale);
 			});
 		})();

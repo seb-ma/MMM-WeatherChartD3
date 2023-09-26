@@ -24,8 +24,8 @@ var config = {
 				apiKey: "",
 				type: "full", // Possible values: hourly, forecast (=daily) or specific value `full` which is a join of data from hourly+daily
 				lang: config.language,
-				lat: "",
-				lon: "",
+				lat: 0,
+				lon: 0,
 				units: config.units,
 				locale: config.locale,
 				d3jsVersion: "7", // can either be in format "7.4" or even "7.4.4"
