@@ -851,8 +851,8 @@ Module.register("MMM-WeatherChartD3", {
 	 * @param {top, right, bottom, left} margins Margins of the chart (in pixels)
 	 */
 	svgAddUvi: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins) {
-		const data = sortedData.filter(d => d.uvi && d.uvi !== null);
-		const getValue = d => parseFloat(d.uvi.toFixed(1));
+		const data = sortedData.filter(d => d.uv_index && d.uv_index !== null);
+		const getValue = d => parseFloat(d.uv_index.toFixed(1));
 
 		const yAxis = d3.scaleLinear()
 			.domain([0, Math.max(10, d3.max(data, d => getValue(d)))])
