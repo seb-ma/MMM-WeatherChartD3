@@ -234,9 +234,9 @@ Module.register("MMM-WeatherChartD3", {
 			// Define icon size and gap between icons
 			if (this.config.iconSize === undefined) {
 				let minDelta = Infinity;
-				for (var i = 1; i < sortedData.length; i++) {
+				for (let i = 1; i < sortedData.length; i++) {
 					const delta = xTime(sortedData[i].date) - xTime(sortedData[i - 1].date)
-					if (minDelta > delta) {
+					if (minDelta > delta && delta > 0) {
 						minDelta = delta;
 					}
 				}
@@ -398,13 +398,13 @@ Module.register("MMM-WeatherChartD3", {
 	 */
 	svgAddDayNight: async function (svg, sortedData, xTime, innerWidth, innerHeight, margins, legendBarWidth) {
 		let sunTimesData = [];
-		var iterd = sortedData[0].date;
+		let iterd = sortedData[0].date;
 		while (iterd <= sortedData[sortedData.length - 1].date) {
 			sunTimesData.push(SunCalc.getTimes(iterd, this.config.lat, this.config.lon));
 			iterd = iterd.clone().add(1, "d");
 		}
 
-		const fctNightWidth = (d1, d2) => Math.min(innerWidth, d2 ? xTime(d2.sunrise) : innerWidth) - Math.max(0, xTime(d1.sunset));
+		const fctNightWidth = (d1, d2) => Math.max(0, Math.min(innerWidth, d2 ? xTime(d2.sunrise) : innerWidth) - Math.max(0, xTime(d1.sunset)));
 
 		// In graph
 		svg.selectAll("grp").append("g")
