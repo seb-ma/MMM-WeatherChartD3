@@ -1,10 +1,9 @@
-/*
- *
- * MMM-WeatherChartD3
- *
- * Sébastien Mazzon
- * MIT Licensed.
- *
+/**
+ * This MagicMirror² module displays a weather chart using any weather provider.
+ * @module MMM-WeatherChartD3
+ * @see `README.md`
+ * @author Sébastien Mazzon
+ * @license MIT - @see `LICENCE.txt`
  */
 
 :root {

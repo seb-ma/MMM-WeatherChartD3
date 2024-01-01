@@ -138,6 +138,15 @@ Module.register("MMM-WeatherChartD3", {
 	},
 
 	/**
+	 * Returns the title of the module
+	 * @see <https://docs.magicmirror.builders/development/core-module-file.html#getheader>
+	 * @returns {string}
+	 */
+	getHeader: function () {
+		return this.data.header || this.translate("TITLE");
+	},
+
+	/**
 	 * Schedules next data retrieving
 	 * @param {integer} delay Delay before updating - use config.updateInterval if null
 	 */
